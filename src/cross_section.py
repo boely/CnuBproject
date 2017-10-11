@@ -4,14 +4,21 @@ from math import *
 # natures constants
 from scipy.constants import codata
 # particle data
-import pypdt
-tbl = pypdt.ParticleDataTable()
+try:
+    import pypdt
+    tbl = pypdt.ParticleDataTable()
+    GZ = tbl[23].width # in GeV
+    MZ  = tbl[23].mass  # in GeV
+except ImportError:
+    print('\n Warning: Pypdt module not installed')
+    GZ = 2.4952
+    MZ = 91.1876
 
 class cross_section():
     def __init__(self):
         self.GF = codata.value('Fermi coupling constant') # in GeV^-2
-        self.GammaZ = tbl[23].width # in GeV
-        self.MassZ  = tbl[23].mass  # in GeV
+        self.GammaZ = GZ
+        self.MassZ = Mz
         self.p = 0.2e-9 # in GeV
         self.m = 0.1e-9 # in GeV
     
