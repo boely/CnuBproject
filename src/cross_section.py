@@ -8,11 +8,11 @@ try:
     import pypdt
     tbl = pypdt.ParticleDataTable()
     GZ = tbl[23].width # in GeV
-    MZ  = tbl[23].mass  # in GeV
+    Mz  = tbl[23].mass  # in GeV
 except ImportError:
     print('\n Warning: Pypdt module not installed')
     GZ = 2.4952
-    MZ = 91.1876
+    Mz = 91.1876
 
 class cross_section():
     def __init__(self):
