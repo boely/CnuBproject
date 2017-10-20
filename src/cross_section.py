@@ -81,8 +81,8 @@ def main(argv):
     E = np.arange(14,18,.0001)
     
     plt.semilogy(E, np.array([X.Sigma_r(pow(10,x)) for x in E]), '-')
-    plt.xlabel("$\log(E\nu$) [GeV]")
-    plt.ylabel("$\sigma$ [cm$^2$]")
+    plt.xlabel("$\log$(E$\\nu$) [GeV]", size =14, position=(1, 0), ha='right')
+    plt.ylabel("$\sigma$ [cm$^2$]", size =14, position=(0,1), ha='right')
     plt.show()
 
 import sys
