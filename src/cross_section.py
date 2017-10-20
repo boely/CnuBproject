@@ -55,12 +55,17 @@ class cross_section():
         aid1 = (2*K*(1+xi)*(Ep+P)-self.MassZ**2)/(self.GammaZ*self.MassZ)
         aid2 = (2*K*(1+xi)*(Ep-P)-self.MassZ**2)/(self.GammaZ*self.MassZ)
         
-        return ( (2*sqrt(2.)*self.GF * self.GammaZ * self.MassZ) / (K * Ep) * \
-            (
-                (1/(1 + xi))
-                + self.MassZ**2/(4*K*P*(1+xi)**2) * log(teller/noemer) \
-                + ((1-xi)*self.MassZ**3 / ((1+xi)**2 * 4*K*P*self.GammaZ)) * ( atan(aid1) - atan(aid2))
-            )
+
+        # convert cross section units:
+        # 1 mb = 1/2.56819 GeV-2, 1mb = 1e-27cm^2
+        C = (1/2.56819)*1e-27
+        
+        return ( C * (2*sqrt(2.)*self.GF * self.GammaZ * self.MassZ) / (K * Ep) * \
+                 (
+                     (1/(1 + xi))
+                     + self.MassZ**2/(4*K*P*(1+xi)**2) * log(teller/noemer) \
+                     + ((1-xi)*self.MassZ**3 / ((1+xi)**2 * 4*K*P*self.GammaZ)) * ( atan(aid1) - atan(aid2))
+                )
         )
 
 
@@ -69,15 +74,15 @@ import matplotlib.pyplot as plt
 
 def main(argv):
     X = cross_section()
-    X.p = 5*6.08e-4*1e-9
-    X.m = 0.1e-4 * 1e-9
-    
+    X.p = 6.08e-4*1e-9
+    X.m = 1e-4 * 1e-9
+
     plt.figure(99)
-    E = np.arange(12,17,.0001)
+    E = np.arange(14,18,.0001)
     
     plt.semilogy(E, np.array([X.Sigma_r(pow(10,x)) for x in E]), '-')
     plt.xlabel("$\log(E\nu$) [GeV]")
-    plt.ylabel("$\sigma$")
+    plt.ylabel("$\sigma$ [cm$^2$]")
     plt.show()
 
 import sys
