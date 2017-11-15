@@ -14,6 +14,10 @@ import scipy.integrate as integrate
 # ============================================================================
 # OTHER ARTICLES referred to in comments:
 # ============================================================================
+# Aar15:
+#   Aartsen, 2015
+#   Atmospheric and Astrophysical Neutrinos above 1 TeV Interacting in IceCube
+#   arXiv:1410.1749v2
 # Ahl14:
 #   Ahlers, 2014
 #   Pinpointing extragalactic neutrino sources in light of recent IceCube 
@@ -23,10 +27,14 @@ import scipy.integrate as integrate
 #   Baumann, 2017
 #   Syllabus Cosmology course UvA 2017
 #   http://www.damtp.cam.ac.uk/user/db275/Cosmology/Lectures.pdf
+# Fan16:
+#   Fang, 2016
+#   High-energy neutrinos from sources in clusters of galaxies
+#   arXiv:1607.00380
 # Fod03:
 #   Fodor, 2003
 #   Bounds on the cosmogenic neutrino flux
-#   arXiv: arXiv:hep-ph/0309171v1
+#   arXiv:hep-ph/0309171v1
 # Oli06:
 #   D'Olivo, 2006
 #   UHE neutrino damping in a thermal gas of relic neutrinos
@@ -34,7 +42,7 @@ import scipy.integrate as integrate
 # Lun13:
 #   Lunardini 2013
 #   Ultra High Energy Neutrinos: Absorption, Thermal Effects and Signatures
-#   arXiv: 1306.1808v2
+#   arXiv:1306.1808v2
 # Wic04:
 #   Wick, 2004
 #   High-energy cosmic rays from gamma-ray bursts
@@ -48,14 +56,15 @@ import scipy.integrate as integrate
 # =================
 
 def E_resonance(m_n):
-    ''' Function to determine the resonance energy for given neutrino mass'''
-    m_z = 91.2e9                    # [eV]
+    ''' Function to determine the resonance energy [eV] 
+    for given neutrino mass [eV]'''
+    m_z = 91.2e9    # [eV]
     return m_z**2 / (2. * m_n)                                                  # (eq 1)
 
 def Hubble(z, h=0.71, Om=0.3, Ol=0.7, Ok=0.):
     '''Function to determine the hubble parameter at given z. The curvature 
-    parameters are given a default values resulting in a flat universe'''
-    H0 = 100 * h                    # [km/s/Mpc]
+    parameters are given a default values resulting in a flat universe'''       # default values from Ebe04
+    H0 = 100 * h    # 100 h [km/s/Mpc]
     return sqrt(H0**2 * ( Om * (1+z)**3 + Ok * (1+z)**2 + Ol) )                 # (eq 8)
 
 
@@ -68,7 +77,7 @@ def Ebe04_survival_probability_P(e, Eres, z,
                                  h=0.71, Om=0.3, Ol=0.7, Ok=0.):
     '''Funtion that returns survival probability for the e values 
     within range: Eres/(1+z) < e < Eres ''' 
-                                                                                # Oli06: annihilation probability should be approximated better using crossections
+                                                                                # Oli06: annihilation probability (ann_prob) better if crossections as a function of energy
     ann_prob = 0.71/h * 0.03        # anihilation probability                   # (eq16)
     assert(float(Om + Ol + Ok) == 1.), "No Flat Universe!"
 
@@ -95,11 +104,11 @@ def Ebe04_source_emissivity_L_z(z, z_max, n_min_alpha):                         
         else: return 0.
     return 0.
 
-def Ebe04_source_emissivity_L_no_z(e, alpha):
+def Ebe04_source_emissivity_L_no_z(e, alpha):                                   # VERY UNCERTAIN!
     '''Function that returns all parts of the source emissivity function that
     DO NOT depend on z'''
-    eta0 = 1e-5                                                                 # Ahl14: local source density in [Mpc^-3]
-    j = 1                                                                       # ? normalisation factor
+    eta0 = 1e-5    # 1e-5 [Mpc^-3]                                              # Ahl14: local source density in [Mpc^-3] different units...
+    j = 3e6                                                                     # normalisation factor ?
     return eta0 * j * e**(-alpha)                                               # (eq 24 --> eq 27&28, but only z-independent part)
 
 
@@ -126,9 +135,34 @@ def Ebe04_neutrino_flux_earth_F(e, Eres, z_max, n, alpha, absorption=True):
     integrant1, err1 = integrate.quad(f1_to_integrate, 0, z_max)                # if z > z_max; L (Ebe04_source_emissivity_L_z) returns 0, therfore this doesn't add anything to the integral
                                                                                 # Lun13: for E > 10^11 GeV, neutrinio horizon of z ~ 140, beyond which universe is opaque to neutrinos <= taking this as upperlimit gives the same
                                                                                 # Bau17: neutrino decoupling at redshift z = 6e9 <= taking this as upperlimit goes wrong... ?
-                                                                                # Ebe04: in eq 23 an integral to np.inf is shown. But this gives the same result as z=z_max, and z=140
+                                                                                # Ebe04: in eq 23 an integral to np.inf is shown. But this gives the same result as z=z_max, and z=140 since z>z_max doesn't add anything
     return 1/(4 * pi) * integrant1 * 1/3. * Ebe04_source_emissivity_L_no_z(e, 
             alpha)
+
+
+def Ebe05_neutrino_flux_earth_F(e, Eres, z_max, n, alpha, Z_decay=False, \
+                                absorption=True):
+    '''Function to determine the Flux per neutrino flavor with the option to
+    include primary flux only (Z_decay = False),
+    or include primary flux as well as secondary flux (Z_decay = True)'''
+
+    primary_flux = Ebe04_neutrino_flux_earth_F(e, Eres, z_max, n, alpha, 
+                                               absorption)
+
+    if absorption == False:
+        # if no absorption; no UHE Z-boson  created, so no secondary neutrinos
+        return primary_flux
+
+    if Z_decay == False:
+        return primary_flux
+
+    elif Z_decay == True:
+        decay_frac_to_nu = 0.4                                                  # Z -> nu nu in 20% of the decaying processes. here times 2 since doublng of neutrino detection possibility
+        secondary_flux = Ebe04_neutrino_flux_earth_F(2*e, Eres, z_max, n, 
+                                                  alpha, absorption=False) - \
+                         Ebe04_neutrino_flux_earth_F(2*e, Eres, z_max, n, 
+                                                  alpha, absorption=True)
+        return primary_flux + secondary_flux * decay_frac_to_nu
 
 
 # =================
@@ -160,14 +194,14 @@ def plot_P():
     plt.show()
 
 
-def plot_F(frac = False):
+def plot_F(frac = False, Z_decay = False):
     '''Function to plot the flux.
     If frac = True, the flux will be plotted divided by the flux when there
     is no absorption.'''
                                                                                 # Fod03, fitting procedure gives the most probable values for Emax, alpha and n.
-    redshifts_max = [2, 5, 20]
+    redshifts_max = [2, 5, 20]  #[2, 5, 20]                                     # z_max
     alphas        = [0.5, 1, 1.5, 2]                                            # spectral index -> (Ebe04: [1-2])
-    ns            = [2, 4, 6]
+    ns            = [2, 4, 6] #[2, 4, 6]                                        # powers of (1+z) in activity Ebe04 eq27
 
     for z_max in redshifts_max:
         if z_max == 2: col = 'r'
@@ -185,48 +219,71 @@ def plot_F(frac = False):
                 E = np.logspace(-2, 0, 10000)*Eres
                     # from 10^-2 to 10^0 in 1000 logarithmic steps
                 F = []
+                F1 = []
 
                 if frac == True:
 
                     Fnoabs = []
                     F_frac_Fnoabs = []
+                    F1noabs = []
+                    F1_frac_Fnoabs = []
+
                     for e in E:
-                        F.append(Ebe04_neutrino_flux_earth_F(e, Eres, z_max, n, 
-                                                             alpha))
-                        Fnoabs.append(Ebe04_neutrino_flux_earth_F(e, Eres, 
-                                                                  z_max, n, 
-                                                                  alpha, 
-                                                                  absorption 
-                                                                  = False))
+                        F.append(Ebe05_neutrino_flux_earth_F(e, Eres, z_max, n, 
+                                      alpha, Z_decay, absorption = True))
+                        Fnoabs.append(Ebe05_neutrino_flux_earth_F(e, Eres, 
+                                      z_max, n, alpha, Z_decay, 
+                                      absorption = False))
                         F_frac_Fnoabs.append(F[-1]/Fnoabs[-1])
+
+                        if Z_decay == True:
+                        # If flux + secondary flux is plotted (Z_decay = True),
+                        # add plot of primary flux only in black, to compare:
+                            F1.append(Ebe05_neutrino_flux_earth_F(e, Eres, 
+                                      z_max, n, alpha, Z_decay=False, 
+                                      absorption = True))
+                            F1noabs.append(Ebe05_neutrino_flux_earth_F(e, Eres, 
+                                      z_max, n, alpha, Z_decay=False,
+                                      absorption = False))
+                            F1_frac_Fnoabs.append(F1[-1]/F1noabs[-1])
 
                     labeltxt = "z_max = %i, n = %i, alpha = %i" %(z_max, n, 
                                                                   alpha)
                     print 'plot', labeltxt
-                    plt.plot(E, F_frac_Fnoabs, linestyle = linst, color = col, 
-                             label = labeltxt)
+                    plt.plot(E/Eres, F_frac_Fnoabs, linestyle = linst, 
+                             color = col, label = labeltxt)
+                    if Z_decay == True: 
+                        plt.plot(E/Eres, F1_frac_Fnoabs, linestyle = linst, 
+                             color = 'black', label = labeltxt)
                     plt.ylabel("F/F_no_abs")
                     plt.text(5e20, 0.65, r'$ m_{\nu} = 0.1 eV $', size = 18)
-                    plt.ylim(0, 1)
+                    #plt.ylim(0, 1.1)
+                    plt.xlim(1e-2, 1)
+                    plt.xlabel("E/Eres")
+
 
                 else:
 
                     for e in E:
-                        F.append(Ebe04_neutrino_flux_earth_F(e, Eres, z_max, n, 
-                                                             alpha))
+                        F.append(Ebe05_neutrino_flux_earth_F(e, Eres, z_max, n, 
+                                     alpha, Z_decay, absorption = True) * e**2)     # < ==  F * E^2
 
                     labeltxt = "z_max = %i, n = %i, alpha = %i" %(z_max, n, 
                                                                   alpha)
                     print 'plot', labeltxt
                     plt.plot(E, F, linestyle = linst, color = col, 
                              label = labeltxt)
-                    plt.ylabel("F")
+                    plt.ylabel("F * E^2")
+                    plt.yscale('log')
                     plt.text(5e21, 1.7e-46, r'$ m_{\nu} = 0.1 eV $', size = 18)
+                    plt.xlim(1e-2 * Eres, Eres)
+                    plt.xlabel("E (eV)")
 
-    plt.xlim(1e-2 * Eres, Eres)
-    plt.legend(loc='best')
-    plt.title("Flux, Ebe04")
-    plt.xlabel("E (eV)")
+    plt.legend(loc = 'best')
+    if Z_decay == True:
+        plt.title("Flux + Z-decay flux, Ebe04+Ebe05")
+    elif Z_decay == False:
+        plt.title("Flux, Ebe04")
     plt.xscale('log')
 #    plt.savefig("Ebe04_Flux.png")
     plt.show()
@@ -237,16 +294,26 @@ def plot_F(frac = False):
 # =================
 
 def main():
+  
     # -- plot absorption probability as a function of Energy
     plot_P()
 
-    # -- plot Flux as a fraction of Flux in case of no absorbtion, 
-    #    as a function of Energy
-    plot_F(frac = True)
+    print "\n###########################################################################################"
+    print "A lot of fluxes will now be plotted for different parameters. This will take a while."
+    print "If you want to plot a specific situation, please command out some plot_functions in the main,"
+    print "and/or reduce the parameters plotted in lines 202, 203, 204 of the script."
+    print "########################################################################################### \n"
 
-    # -- plot Flux as a function of Energy
-    plot_F()
+    # -- plot Flux as a fraction of Flux in case of no absorbtion, 
+    #    as a function of Energy/Eres
+    plot_F(frac = True, Z_decay = False)
+    plot_F(frac = True, Z_decay = True)
+                                                                                # Aar15 referred to in Fan16:
+    # -- plot Flux as a function of Energy                                      # The all-flavor diffuse neutrino flux is reported to be phi = 2.06e-18 (E / (1e5 GeV))**-2.46 GeV^-1 cm^-1 sr^-1 s^-1
+    plot_F(Z_decay = False) # F * E^2 is plotted here (see line 269)            # for the energy range of 25TeV < E < 1.4 PeV (Aartsen et al. 2015)
+    plot_F(Z_decay = True)  # F * E^2 is plotted here (see line 269)
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
