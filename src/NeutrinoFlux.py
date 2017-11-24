@@ -1,5 +1,4 @@
 from math import *
-import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import scipy.integrate as integrate
@@ -49,12 +48,6 @@ import os
 #   High-energy cosmic rays from gamma-ray bursts
 #   arXiv:astro-ph/0310667v2
 # ============================================================================
-
-# =================
-# "Basic formula's"
-#  - Resonance energy
-#  - Hubble parameter
-# =================
 
 class NeutrinoFlux():
     def __init__(self):
@@ -116,8 +109,7 @@ class NeutrinoFlux():
     def Ebe04_source_emissivity_L_no_z(self, e):
         # VERY UNCERTAIN!
         '''Function that returns all parts of the source emissivity function that DO NOT depend on z'''
-        # Ahl14: local source density in [Mpc^-3] different units...
-        
+
         # (eq 24 --> eq 27&28, but only z-independent part)
         return self.eta0 * self.j * e**(-self.alpha)                                               
 
