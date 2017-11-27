@@ -139,6 +139,10 @@ def plot_F(flux, frac = False, Z_decay = False):
     plt.show()
 
 
+def usage():
+    print "Usage:  %s  <config-file>  <outfile> \n" % os.path.basename
+(sys.argv[0])
+
 
 def main():
 
