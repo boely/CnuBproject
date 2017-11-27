@@ -14,7 +14,6 @@ from scipy.interpolate import interp1d
 import scipy.integrate as integrate
 
 
-
 # =================
 # number of events
 # =================
@@ -33,13 +32,13 @@ def events(Flux):
 # Flux data
 # =================
 
-def spectrum_func(e, H, E_H0, FE2_H0, E_H1, FE2_H1 ):    # mean expected events
+def spectrum_func(e, H, E_H, FE2_H0, FE2_H1 ):    # mean expected events
     '''Function that returns a function for the null hypothesis H = H0 
     (constant spectrum), and H = H1 hypothesis (dip in spectrum) '''
 
     # interpolate the separate datapoints
-    f_H0 = interp1d(E_H0, FE2_H0)
-    f_H1 = interp1d(E_H1, FE2_H1)
+    f_H0 = interp1d(E_H, FE2_H0)
+    f_H1 = interp1d(E_H, FE2_H1)
 
     if H == 'H0':
         return f_H0(e)
@@ -47,30 +46,30 @@ def spectrum_func(e, H, E_H0, FE2_H0, E_H1, FE2_H1 ):    # mean expected events
         return f_H1(e)
 
 
-def fill_hist( func, H, E_H0, FE2_H0, E_H1, FE2_H1):
+def fill_hist( func, H, E_H, FE2_H0, FE2_H1):
     '''Function to plot a histogram according to a function func, given the 
     hypothesis H'''
     bins = 100
-    h1 = ROOT.TH1D( 'h1','hypotheses', bins, min(E_H0), max(E_H0))
+    h1 = ROOT.TH1D( 'h1','hypotheses', bins, min(E_H), max(E_H))
 
-    Binwidth = (max(E_H0)-min(E_H0))/bins
+    Binwidth = (max(E_H)-min(E_H))/bins
 
     for be in range( 1, h1.GetNbinsX() + 1 ):
         e = h1.GetXaxis().GetBinCenter( be )
         b = h1.GetBin( be ) # global bin number
-        z = func(e, H, E_H0, FE2_H0, E_H1, FE2_H1 )
+        z = func(e, H, E_H, FE2_H0, FE2_H1 )
         h1.SetBinContent( b, z )
 
     return h1
 
 
-def draw_H0_H1(E_H0, FE2_H0, E_H1, FE2_H1):
+def draw_H0_H1(E_H, FE2_H0, FE2_H1):
     '''Function that draws H0 and H1 from imported data in a histogram'''
     c1 = ROOT.TCanvas()
-    h1 = fill_hist( spectrum_func , 'H0', E_H0, FE2_H0, E_H1, FE2_H1)
+    h1 = fill_hist( spectrum_func , 'H0', E_H, FE2_H0, FE2_H1)
     h1.SetLineStyle(3)
     h1.Draw('LSAME')
-    h2 = fill_hist( spectrum_func , 'H1', E_H0, FE2_H0, E_H1, FE2_H1)
+    h2 = fill_hist( spectrum_func , 'H1', E_H, FE2_H0, FE2_H1)
     h2.Draw('LSAME')
     h2.SetXTitle("Energy (eV)")
     h2.SetYTitle("Flux per bin")
@@ -85,14 +84,13 @@ def draw_H0_H1(E_H0, FE2_H0, E_H1, FE2_H1):
 # Accept-reject function
 # =================
 
-def accept_reject(E_H0, FE2_H0, E_H1, FE2_H1, H ):
+def accept_reject(E_H, FE2_H0, FE2_H1, H ):
     '''Function for acceptence, rejection in the ranges E_min-E_max, 0-FE2_max
     an accepted energy value will be returned'''
+    E = E_H
     if H == 'H1': 
-        E = E_H1
         FE2 = FE2_H1
     elif H == 'H0':
-        E = E_H0
         FE2 = FE2_H0
 
     # bounds of the box to create random numbers in:
@@ -104,7 +102,7 @@ def accept_reject(E_H0, FE2_H0, E_H1, FE2_H1, H ):
     rand_f_ui = ROOT.gRandom.Rndm() * FE2_max                                   # uniformly distributed number between 0 and FE2_max
 
     #  -  accept-reject function
-    while(spectrum_func( rand_e_xi, H, E_H0, FE2_H0, E_H1, FE2_H1) <= rand_f_ui ):
+    while(spectrum_func( rand_e_xi, H, E_H, FE2_H0, FE2_H1) <= rand_f_ui ):
         rand_e_xi = ROOT.gRandom.Rndm() * (E_max - E_min) + E_min
         rand_f_ui = ROOT.gRandom.Rndm() * FE2_max
     return rand_e_xi
@@ -114,16 +112,16 @@ def accept_reject(E_H0, FE2_H0, E_H1, FE2_H1, H ):
 # Likelihood
 # =================
 
-def log_likelihood(hist, H, N_events, E_H0, FE2_H0, E_H1, FE2_H1):
+def log_likelihood(hist, H, N_events, E_H, FE2_H0, FE2_H1):
     '''Function that returns the log likelihood for a given hypothesis 'H' with
     respect to the given histogram 'hist' with your data. 
-    NB: make sure FE2_H0 and FE_H1, interpolated are normalized to 1'''
+    NB: make sure FE2_H0 and FE2_H1, interpolated are normalized to 1'''
     loglik = 0.
 
     # -- loop over bins
     for i_bin in range( 1, hist.GetNbinsX() + 1 ):
         e = hist.GetBinCenter( i_bin )                                          # energy (centre of bin) 
-        mu_bin = spectrum_func(e, H, E_H0, FE2_H0, E_H1, FE2_H1) * hist.GetBinWidth(1) * N_events     # theoretical amount of counts in bin
+        mu_bin = spectrum_func(e, H, E_H, FE2_H0, FE2_H1) * hist.GetBinWidth(1) * N_events     # theoretical amount of counts in bin
         Nevt_bin = hist.GetBinContent( i_bin )                                  # the amount of counts in bin found in the data of histogram h
 
         if ROOT.TMath.Poisson( Nevt_bin, mu_bin ) > 0:                          # <= check if&when this will happen
@@ -132,33 +130,33 @@ def log_likelihood(hist, H, N_events, E_H0, FE2_H0, E_H1, FE2_H1):
     return loglik
 
 
-def LLR(hist, N_events, E_H0, FE2_H0, E_H1, FE2_H1):
+def LLR(hist, N_events, E_H, FE2_H0, FE2_H1):
     '''Function that caluclates the likelihood ratio'''
-    L_H0 = log_likelihood(hist, 'H0', N_events, E_H0, FE2_H0, E_H1, FE2_H1)
-    L_H1 = log_likelihood(hist, 'H1', N_events, E_H0, FE2_H0, E_H1, FE2_H1)
+    L_H0 = log_likelihood(hist, 'H0', N_events, E_H, FE2_H0, FE2_H1)
+    L_H1 = log_likelihood(hist, 'H1', N_events, E_H, FE2_H0, FE2_H1)
     LLR = L_H1 - L_H0
     return LLR
 
 
-def plot_LLR_value_in_hist(N_events, bins, Eresolution, H, hist, E_H0, FE2_H0, E_H1, FE2_H1):
+def plot_LLR_value_in_hist(N_events, bins, Eresolution, H, hist, E_H, FE2_H0, FE2_H1):
     '''Function that fills the given histogram 'hist', with the LLR for 
     pseudo experiment data based on hypothesis 'H' '''
-    h4 = pseudo_exp(N_events, bins, Eresolution, H, E_H0, FE2_H0, E_H1, FE2_H1)
-    LLratio_Hdata = LLR(h4, N_events, E_H0, FE2_H0, E_H1, FE2_H1)
+    h4 = pseudo_exp(N_events, bins, Eresolution, H, E_H, FE2_H0, FE2_H1)
+    LLratio_Hdata = LLR(h4, N_events, E_H, FE2_H0, FE2_H1)
     hist.Fill(LLratio_Hdata)
     h4.Delete()
     return LLratio_Hdata
 
 
-def pseudo_exp(N_events, bins, Eresolution, H, E_H0, FE2_H0, E_H1, FE2_H1):
+def pseudo_exp(N_events, bins, Eresolution, H, E_H, FE2_H0, FE2_H1):
     '''Functin that creates pseudo experiments of N_events detections,
     based on the acceptence - rejection method'''
 #    c3 = ROOT.TCanvas()
-    h3 = ROOT.TH1D( 'h3','accept_reject, N=%s'%(N_events), bins, min(E_H0), max(E_H0))
+    h3 = ROOT.TH1D( 'h3','accept_reject, N=%s'%(N_events), bins, min(E_H), max(E_H))
     for i in range(N_events):
 #        if i % (N_events/10) == 0:
 #            print "%s/%s" %(i, N_events)
-        E = accept_reject(E_H0, FE2_H0, E_H1, FE2_H1, H)
+        E = accept_reject(E_H, FE2_H0, FE2_H1, H)
         E = E * ROOT.gRandom.Gaus(1., Eresolution/100) #Gauss(mean, sigma)          # <= wat doen met E<0?!
         h3.Fill(E)
 #    h3.Draw()
@@ -238,38 +236,37 @@ def median(lst):
 # =================
 
 def usage():
-    print "Usage:  python  %s  <H0data-file>  <H1data-file> \n" % os.path.basename(sys.argv[0])
+    print "Usage:  python  %s  <Fluxdata-file> \n" % os.path.basename(sys.argv[0])
 
 def main():
     
     ROOT.gStyle.SetOptStat(0)                                                   # do not show statistics box
 
     args = sys.argv[1:]
-    if "-h" in args or "--help" in args or len(args) < 2:
+    if "-h" in args or "--help" in args or len(args) < 1:
         usage()
         sys.exit(2)
 
     # -- import flux data
-    E_H0, FE2_H0 = np.loadtxt(sys.argv[1], delimiter = ',', unpack=True)
-    E_H1, FE2_H1 = np.loadtxt(sys.argv[2], delimiter = ',', unpack=True)
-#    draw_H0_H1(E_H0, FE2_H0, E_H1, FE2_H1)
+    E_H, FE2_H0, FE2_H1 = np.loadtxt(sys.argv[1], delimiter = '\t', unpack=True)
+#    draw_H0_H1(E_H, FE2_H0, FE2_H1)
 
     # -- normalize flux data (and plot)
-    Binsize = E_H0[1]-E_H0[0]
+    Binsize = E_H[1]-E_H[0]
     FE2_H1_norm = FE2_H1 / (sum(FE2_H1) * Binsize)
     FE2_H0_norm = FE2_H0 / (sum(FE2_H0) * Binsize)                              # Also divide by binsize to make sure that the interpolated function is normalized to 1
-    #draw_H0_H1(E_H0, FE2_H0_norm, E_H1, FE2_H1_norm)
+    #draw_H0_H1(E_H, FE2_H0_norm, FE2_H1_norm)
 
     # -- check that the continuous function made with spectrum_func given FE2_H_norm data equals 1
-#    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H0, FE2_H0_norm, E_H1, FE2_H1_norm)
-#    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H0, FE2_H0_norm, E_H1, FE2_H1_norm)
-#    integrant0, err1 = integrate.quad(f0_to_integrate, min(E_H0), max(E_H0))
-#    integrant1, err1 = integrate.quad(f1_to_integrate, min(E_H0), max(E_H0))
+#    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H, FE2_H0_norm, FE2_H1_norm)
+#    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H, FE2_H0_norm, FE2_H1_norm)
+#    integrant0, err1 = integrate.quad(f0_to_integrate, min(E_H), max(E_H))
+#    integrant1, err1 = integrate.quad(f1_to_integrate, min(E_H), max(E_H))
 #    print 'integrant0, integrant1', integrant0, integrant1
 
     # -- Create Pseudo Measurement for N_events according to H0, and H1, (plot, and save figure)
-#    pseudo_exp(1000, 100, 0, 'H0', E_H0, FE2_H0_norm, E_H1, FE2_H1_norm)
-#    pseudo_exp(1000, 100, 0, 'H1', E_H0, FE2_H0_norm, E_H1, FE2_H1_norm)
+#    pseudo_exp(1000, 100, 0, 'H0', E_H, FE2_H0_norm, FE2_H1_norm)
+#    pseudo_exp(1000, 100, 0, 'H1', E_H, FE2_H0_norm, FE2_H1_norm)
 
 
     # =================
@@ -314,8 +311,8 @@ def main():
             for i in range(I_repetitions):
                 if i % 10 == 0:
                     print "i = %s/%s" %(i,I_repetitions)
-                LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H0, FE2_H0_norm, E_H1, FE2_H1_norm))
-                LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H0, FE2_H0_norm, E_H1, FE2_H1_norm))
+                LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H, FE2_H0_norm, FE2_H1_norm))
+                LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H, FE2_H0_norm, FE2_H1_norm))
     
             savingname = "H0_H1_data_Nevt_%i_Irep_%i.txt"%(N_events[-1], I_repetitions)
             with open(savingname, 'w') as f:
