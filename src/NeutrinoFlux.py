@@ -118,7 +118,7 @@ class NeutrinoFlux():
         the survival probability * source emissivity / Hubble parameter
         over all redshifts z and multiply it by some constants.
         When no absorption is included the survival probabiliy is set to 1'''
-        
+
         if absorption == True:
             # - function to integrate for Flux
             f1_to_integrate = lambda z: 1/self.Hubble(z) * \
@@ -167,35 +167,28 @@ class NeutrinoFlux():
     def save_to_ascii(self, prefix):
         Z_decay = True
         E = np.linspace(1e18, 5e22, 10000)
-        
-        H0savename = prefix + "_H0_m%s_zmax%i_n%i_alpha%i_Zdecay%s.txt" \
+
+        savename = prefix + "_H0H1_m%s_zmax%i_n%i_alpha%i_Zdecay%s.txt" \
                      %(self.m_n , self.z_max, self.n, self.alpha, Z_decay)
-        H1savename = prefix + "_H1_m%s_zmax%i_n%i_alpha%i_Zdecay%s.txt" \
-                     %(self.m_n , self.z_max, self.n, self.alpha, Z_decay)
-        
-        if H0savename in  os.listdir(os.curdir):
-            print "Do you want to overwrite the files \n - %s \n - %s" %(H0savename, H1savename)
+
+        if savename in  os.listdir(os.curdir):
+            print "Do you want to overwrite the file \n - %s" %(savename)
             var = raw_input("Please enter Y or N: ")
             while var != 'Y' and var != 'N':
                 print "###\nUnknown input, please try again:"
-                print "Do you want to overwrite the files \n - %s \n - %s" %(H0savename, H1savename)
-            var = raw_input("Please enter Y or N: ")
+                print "Do you want to overwrite the file \n - %s" %(savename)
+                var = raw_input("Please enter Y or N: ")
             if var == 'N':
                 sys.exit()
                 
         # H0 data: there is NO dip in the spectrum
         print "Writing E, FE^2 data to txt file for absorption (H1), and no absorption (H0). \nOne moment please..."
-        with open(H0savename, 'w') as f:
+        with open(savename, 'w') as f:
             for e in E:
-                FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = False)*(e**2)
-                line = "%s\t%s\n" %(e, FluxE2)
-                f.write(line)
-                
-            # H1 data: there is A dip in the spectrum
-        with open(H1savename, 'w') as f:
-            for e in E:
-                FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = True)*(e**2)
-                line = "%s\t%s\n" %(e, FluxE2)
+                H0FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = False)*(e**2)
+                H1FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = True)*(e**2)
+                line = "%s\t%s\t%s\n" %(e, H0FluxE2, H1FluxE2)
+                print line
                 f.write(line)
 
 
