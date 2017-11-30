@@ -28,7 +28,8 @@ def main():
     flux.n     = config.getfloat("Flux", "n") 
     flux.m_n   = config.getfloat("Flux", "m_n") 
     flux.eta0  = config.getfloat("Flux", "eta0") 
-    flux.j     = config.getfloat("Flux", "j") 
+    flux.j     = config.getfloat("Flux", "j")
+    flux.Z_decay = config.getboolean("Flux","Z_decay")
     flux.Eresolution = config.getfloat("Telescope", "energy_resolution")
 
     prefix_outfilename = args[1]
