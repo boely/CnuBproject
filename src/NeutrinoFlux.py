@@ -64,7 +64,7 @@ class NeutrinoFlux():
             self.E_resonance()
         self.Emin = 0.
         self.Emax = 5e22
-            
+
     def E_resonance(self):
         ''' Function to determine the resonance energy [eV] 
         for given neutrino mass [eV]'''
@@ -146,7 +146,7 @@ class NeutrinoFlux():
         return 1/(4 * pi) * integrant1 * 1/3. * self.Ebe04_source_emissivity_L_no_z(e)
 
 
-    def Ebe05_neutrino_flux_earth_F(self, e, Z_decay=False, absorption=True):
+    def Ebe05_neutrino_flux_earth_F(self, e, absorption=True):
         '''Function to determine the Flux per neutrino flavor with the option to
         include primary flux only (Z_decay = False),
         or include primary flux as well as secondary flux (Z_decay = True)'''
@@ -155,24 +155,24 @@ class NeutrinoFlux():
         
         if absorption == False:
             # if no absorption; no UHE Z-boson created, so no secondary neutrinos
-            return primary_flux
+            return primary_flux                                                 # <== eigenlijk nog keer 3 ivm 3 Neutrino spicies, maar y-as is toch arbitrary
         
-        if Z_decay == False:
+        if self.Z_decay == False:
             return primary_flux
-        
-        elif Z_decay == True:
+
+        elif self.Z_decay == True:
             # Z -> nu nu in 20% of the decaying processes. here times 2 since doubling of neutrino detection possibility
             decay_frac_to_nu = 0.4
             secondary_flux = self.Ebe04_neutrino_flux_earth_F(2*e, absorption=False) - \
                              self.Ebe04_neutrino_flux_earth_F(2*e, absorption=True)
             return primary_flux + secondary_flux * decay_frac_to_nu
-            
+
 
     def save_to_ascii(self, prefix):
         E = np.linspace(self.E_min, self.E_max, 10000)                                      # <= RANGE config dep!
 
         savename = prefix + "_H0H1_m%s_zmax%i_n%i_alpha%i_Zdecay%s.txt" \
-                     %(self.m_n , self.z_max, self.n, self.alpha, Z_decay)
+                     %(self.m_n , self.z_max, self.n, self.alpha, self.Z_decay)
 
 #        if savename in  os.listdir(os.curdir):
 #            print "Do you want to overwrite the file \n - %s" %(savename)
@@ -183,9 +183,9 @@ class NeutrinoFlux():
 #                var = raw_input("Please enter Y or N: ")
 #            if var == 'N':
 #                sys.exit()
-                
+
         # H0 data: there is NO dip in the spectrum
-        print "Writing E, FE^2 data to txt file for absorption (H1), and no absorption (H0). \nOne moment please..."
+        print "Writing data to txt file for absorption (H1), and no absorption (H0). \nOne moment please..."
         with open(savename, 'w') as f:
             if self.FluxEalpha == True:
                 for e in E:
