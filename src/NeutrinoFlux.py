@@ -58,6 +58,7 @@ class NeutrinoFlux():
         self.m_n = 1.
         self.eta0 = 1e-5 # [Mpc^-3]
         self.j = 3e6
+        self.Z_decay = True
         if self.m_n >0:
             self.E_resonance()
             
@@ -165,7 +166,6 @@ class NeutrinoFlux():
             
 
     def save_to_ascii(self, prefix):
-        Z_decay = True
         E = np.linspace(1e18, 5e22, 10000)
 
         savename = prefix + "_H0H1_m%s_zmax%i_n%i_alpha%i_Zdecay%s.txt" \
@@ -188,7 +188,5 @@ class NeutrinoFlux():
                 H0FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = False)*(e**2)
                 H1FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = True)*(e**2)
                 line = "%s\t%s\t%s\n" %(e, H0FluxE2, H1FluxE2)
-                print line
                 f.write(line)
-
 
