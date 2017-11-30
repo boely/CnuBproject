@@ -13,7 +13,6 @@ def usage():
 
 def main():
     args = sys.argv[1:]
-    print len(args)
     if "-h" in args or "--help" in args or len(args) < 2:
         usage()
         sys.exit(2)
@@ -30,7 +29,12 @@ def main():
     flux.eta0  = config.getfloat("Flux", "eta0") 
     flux.j     = config.getfloat("Flux", "j")
     flux.Z_decay = config.getboolean("Flux","Z_decay")
+    flux.FluxEalpha = config.getboolean("Flux", "FluxEalpha")
     flux.Eresolution = config.getfloat("Telescope", "energy_resolution")
+    if flux.m_n >0:
+        flux.E_resonance()
+    flux.E_min = config.getfloat("Telescope", "E_min")
+    flux.E_max = config.getfloat("Telescope", "E_max")
 
     prefix_outfilename = args[1]
     flux.save_to_ascii(prefix_outfilename)
