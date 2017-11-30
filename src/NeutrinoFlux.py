@@ -59,8 +59,11 @@ class NeutrinoFlux():
         self.eta0 = 1e-5 # [Mpc^-3]
         self.j = 3e6
         self.Z_decay = True
+        self.FluxEalpha = True
         if self.m_n >0:
             self.E_resonance()
+        self.Emin = 0.
+        self.Emax = 5e22
             
     def E_resonance(self):
         ''' Function to determine the resonance energy [eV] 
@@ -166,27 +169,34 @@ class NeutrinoFlux():
             
 
     def save_to_ascii(self, prefix):
-        E = np.linspace(1e18, 5e22, 10000)
+        E = np.linspace(self.E_min, self.E_max, 10000)                                      # <= RANGE config dep!
 
         savename = prefix + "_H0H1_m%s_zmax%i_n%i_alpha%i_Zdecay%s.txt" \
                      %(self.m_n , self.z_max, self.n, self.alpha, Z_decay)
 
-        if savename in  os.listdir(os.curdir):
-            print "Do you want to overwrite the file \n - %s" %(savename)
-            var = raw_input("Please enter Y or N: ")
-            while var != 'Y' and var != 'N':
-                print "###\nUnknown input, please try again:"
-                print "Do you want to overwrite the file \n - %s" %(savename)
-                var = raw_input("Please enter Y or N: ")
-            if var == 'N':
-                sys.exit()
+#        if savename in  os.listdir(os.curdir):
+#            print "Do you want to overwrite the file \n - %s" %(savename)
+#            var = raw_input("Please enter Y or N: ")
+#            while var != 'Y' and var != 'N':
+#                print "###\nUnknown input, please try again:"
+#                print "Do you want to overwrite the file \n - %s" %(savename)
+#                var = raw_input("Please enter Y or N: ")
+#            if var == 'N':
+#                sys.exit()
                 
         # H0 data: there is NO dip in the spectrum
         print "Writing E, FE^2 data to txt file for absorption (H1), and no absorption (H0). \nOne moment please..."
         with open(savename, 'w') as f:
-            for e in E:
-                H0FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = False)*(e**2)
-                H1FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, Z_decay, absorption = True)*(e**2)
-                line = "%s\t%s\t%s\n" %(e, H0FluxE2, H1FluxE2)
-                f.write(line)
+            if self.FluxEalpha == True:
+                for e in E:
+                    H0FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, absorption = False) * (e**self.alpha)
+                    H1FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, absorption = True) * (e**self.alpha)
+                    line = "%s\t%s\t%s\n" %(e, H0FluxE2, H1FluxE2)
+                    f.write(line)
+            else:
+                for e in E:
+                    H0FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, absorption = False)
+                    H1FluxE2 = self.Ebe05_neutrino_flux_earth_F(e, absorption = True)
+                    line = "%s\t%s\t%s\n" %(e, H0FluxE2, H1FluxE2)
+                    f.write(line)
 
