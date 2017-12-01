@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import ROOT
 from scipy.interpolate import interp1d
 import scipy.integrate as integrate
+from bisect import bisect_left
 
 
 # =================
@@ -32,13 +33,13 @@ def events(Flux):
 # Flux data
 # =================
 
-def spectrum_func(e, H, E_H, FE2_H0, FE2_H1 ):    # mean expected events
+def spectrum_func(e, H, E_H, Flux_H0, Flux_H1 ):    # mean expected events
     '''Function that returns a function for the null hypothesis H = H0 
     (constant spectrum), and H = H1 hypothesis (dip in spectrum) '''
 
     # interpolate the separate datapoints
-    f_H0 = interp1d(E_H, FE2_H0)
-    f_H1 = interp1d(E_H, FE2_H1)
+    f_H0 = interp1d(E_H, Flux_H0)
+    f_H1 = interp1d(E_H, Flux_H1)
 
     if H == 'H0':
         return f_H0(e)
@@ -46,7 +47,7 @@ def spectrum_func(e, H, E_H, FE2_H0, FE2_H1 ):    # mean expected events
         return f_H1(e)
 
 
-def fill_hist( func, H, E_H, FE2_H0, FE2_H1):
+def fill_hist( func, H, E_H, Flux_H0, Flux_H1):
     '''Function to plot a histogram according to a function func, given the 
     hypothesis H'''
     bins = 100
@@ -57,19 +58,19 @@ def fill_hist( func, H, E_H, FE2_H0, FE2_H1):
     for be in range( 1, h1.GetNbinsX() + 1 ):
         e = h1.GetXaxis().GetBinCenter( be )
         b = h1.GetBin( be ) # global bin number
-        z = func(e, H, E_H, FE2_H0, FE2_H1 )
+        z = func(e, H, E_H, Flux_H0, Flux_H1 )
         h1.SetBinContent( b, z )
 
     return h1
 
 
-def draw_H0_H1(E_H, FE2_H0, FE2_H1):
+def draw_H0_H1(E_H, Flux_H0, Flux_H1):
     '''Function that draws H0 and H1 from imported data in a histogram'''
     c1 = ROOT.TCanvas()
-    h1 = fill_hist( spectrum_func , 'H0', E_H, FE2_H0, FE2_H1)
+    h1 = fill_hist( spectrum_func , 'H0', E_H, Flux_H0, Flux_H1)
     h1.SetLineStyle(3)
     h1.Draw('LSAME')
-    h2 = fill_hist( spectrum_func , 'H1', E_H, FE2_H0, FE2_H1)
+    h2 = fill_hist( spectrum_func , 'H1', E_H, Flux_H0, Flux_H1)
     h2.Draw('LSAME')
     h2.SetXTitle("Energy (eV)")
     h2.SetYTitle("Flux per bin")
@@ -81,88 +82,109 @@ def draw_H0_H1(E_H, FE2_H0, FE2_H1):
 
 
 # =================
-# Accept-reject function
+# Inverse Transform
 # =================
 
-def accept_reject(E_H, FE2_H0, FE2_H1, H ):
-    '''Function for acceptence, rejection in the ranges E_min-E_max, 0-FE2_max
-    an accepted energy value will be returned'''
-    E = E_H
+def binary_search(a, x):
+    '''Function that returns the position in list a closest to value x
+    if x is exactly halfway two values, it takes the upper index,
+    if x is below the lowest value, index 0 is returned
+    if x is above the upper value, the last index is returned'''
+    if x < a[0]:
+        return 0
+    elif x > a[-1]:
+        return -1
+    else:
+        pos = bisect_left(a, x)  # find insertion position coming from left
+        if float(a[pos]) == float(x):
+            return pos
+        elif a[pos] - x > x - a[pos-1]:
+            return pos - 1
+        else:
+            return pos
+
+
+def integr_spectrum_func(E_H, Flux_H):
+    '''Function thet returns stepwise integrated Flux'''
+    Int_Flux_H = [Flux_H[0]]
+    for i in range(len(E_H)-1):
+        i += 1
+        Int_Flux_H.append(Int_Flux_H[-1]+Flux_H[i])
+    return Int_Flux_H
+
+
+def inverse_transform(E_H, Int_Flux_H0, Int_Flux_H1, H):
     if H == 'H1': 
-        FE2 = FE2_H1
+        Int_Flux = Int_Flux_H1
     elif H == 'H0':
-        FE2 = FE2_H0
+        Int_Flux = Int_Flux_H0
 
-    # bounds of the box to create random numbers in:
-    E_min = min(E)
-    E_max = max(E)
-    FE2_max = max(FE2)
+    # bounds of the fluxvalues to create random number in:
+    Int_Flux_max = max(Int_Flux)
 
-    rand_e_xi = ROOT.gRandom.Rndm() * (E_max - E_min) + E_min                   # uniformly distributed number between E_min and E_max
-    rand_f_ui = ROOT.gRandom.Rndm() * FE2_max                                   # uniformly distributed number between 0 and FE2_max
+    rand_f = ROOT.gRandom.Rndm() * Int_Flux_max                                   # uniformly distributed number between 0 and Flux_max
+    rand_e = E_H[binary_search(Int_Flux, rand_f)]
 
-    #  -  accept-reject function
-    while(spectrum_func( rand_e_xi, H, E_H, FE2_H0, FE2_H1) <= rand_f_ui ):
-        rand_e_xi = ROOT.gRandom.Rndm() * (E_max - E_min) + E_min
-        rand_f_ui = ROOT.gRandom.Rndm() * FE2_max
-    return rand_e_xi
-
+    return rand_e
 
 # =================
 # Likelihood
 # =================
 
-def log_likelihood(hist, H, N_events, E_H, FE2_H0, FE2_H1):
+def log_likelihood(hist, H, N_events, E_H, Flux_H0, Flux_H1):
     '''Function that returns the log likelihood for a given hypothesis 'H' with
     respect to the given histogram 'hist' with your data. 
-    NB: make sure FE2_H0 and FE2_H1, interpolated are normalized to 1'''
+    NB: make sure Flux_H0 and Flux_H1, interpolated are normalized to 1'''
     loglik = 0.
 
     # -- loop over bins
     for i_bin in range( 1, hist.GetNbinsX() + 1 ):
         e = hist.GetBinCenter( i_bin )                                          # energy (centre of bin) 
-        mu_bin = spectrum_func(e, H, E_H, FE2_H0, FE2_H1) * hist.GetBinWidth(1) * N_events     # theoretical amount of counts in bin
+        mu_bin = spectrum_func(e, H, E_H, Flux_H0, Flux_H1) * hist.GetBinWidth(1) * N_events     # theoretical amount of counts in bin
         Nevt_bin = hist.GetBinContent( i_bin )                                  # the amount of counts in bin found in the data of histogram h
 
         if ROOT.TMath.Poisson( Nevt_bin, mu_bin ) > 0:                          # <= check if&when this will happen
             loglik += ROOT.TMath.Log( ROOT.TMath.Poisson( Nevt_bin, mu_bin ) )
-
+        else:
+            print "Negative probability!!"
     return loglik
 
 
-def LLR(hist, N_events, E_H, FE2_H0, FE2_H1):
+def LLR(hist, N_events, E_H, Flux_H0, Flux_H1):
     '''Function that caluclates the likelihood ratio'''
-    L_H0 = log_likelihood(hist, 'H0', N_events, E_H, FE2_H0, FE2_H1)
-    L_H1 = log_likelihood(hist, 'H1', N_events, E_H, FE2_H0, FE2_H1)
+    L_H0 = log_likelihood(hist, 'H0', N_events, E_H, Flux_H0, Flux_H1)
+    L_H1 = log_likelihood(hist, 'H1', N_events, E_H, Flux_H0, Flux_H1)
     LLR = L_H1 - L_H0
     return LLR
 
 
-def plot_LLR_value_in_hist(N_events, bins, Eresolution, H, hist, E_H, FE2_H0, FE2_H1):
+def plot_LLR_value_in_hist(N_events, bins, Eresolution, H, hist, E_H, Flux_H0, Flux_H1, Int_Flux_H0, Int_Flux_H1):
     '''Function that fills the given histogram 'hist', with the LLR for 
     pseudo experiment data based on hypothesis 'H' '''
-    h4 = pseudo_exp(N_events, bins, Eresolution, H, E_H, FE2_H0, FE2_H1)
-    LLratio_Hdata = LLR(h4, N_events, E_H, FE2_H0, FE2_H1)
+    h4 = pseudo_exp(N_events, bins, Eresolution, H, E_H, Int_Flux_H0, Int_Flux_H1)
+    LLratio_Hdata = LLR(h4, N_events, E_H, Flux_H0, Flux_H1)
     hist.Fill(LLratio_Hdata)
     h4.Delete()
     return LLratio_Hdata
 
 
-def pseudo_exp(N_events, bins, Eresolution, H, E_H, FE2_H0, FE2_H1):
+def pseudo_exp(N_events, bins, Eresolution, H, E_H, Int_Flux_H0, Int_Flux_H1):
     '''Functin that creates pseudo experiments of N_events detections,
     based on the acceptence - rejection method'''
 #    c3 = ROOT.TCanvas()
-    h3 = ROOT.TH1D( 'h3','accept_reject, N=%s'%(N_events), bins, min(E_H), max(E_H))
+    h3 = ROOT.TH1D( 'h3','inverse_transform, N=%s'%(N_events), bins, min(E_H), max(E_H))
     for i in range(N_events):
 #        if i % (N_events/10) == 0:
 #            print "%s/%s" %(i, N_events)
-        E = accept_reject(E_H, FE2_H0, FE2_H1, H)
-        E = E * ROOT.gRandom.Gaus(1., Eresolution/100) #Gauss(mean, sigma)          # <= wat doen met E<0?!
+        E = inverse_transform(E_H, Int_Flux_H0, Int_Flux_H1, H)
+        E = E * ROOT.gRandom.Gaus(1., Eresolution/100.) #Gauss(mean, sigma)          # <= wat doen met E<0?!
         h3.Fill(E)
 #    h3.Draw()
     h3.SetXTitle("Energy (eV)")
-    h3.SetYTitle("counts per bin")
-#    c3.SaveAs("pseudo_event_Eresol%s_N%s_%s.png"%(Eresolution, N_events,H))
+    h3.SetYTitle("Counts per bin")
+#    c3.SaveAs("inverse_transform_pseudo_event_Eresol%s_N%s_%s.png"%(Eresolution, N_events, H))
+
+#    h3.Write('inverse_transform, %s, N=%s, Eres=%s'%(H, N_events, Eresolution))
     return h3
 
 
@@ -239,7 +261,7 @@ def usage():
     print "Usage:  python  %s  <Fluxdata-file> \n" % os.path.basename(sys.argv[0])
 
 def main():
-    
+
     ROOT.gStyle.SetOptStat(0)                                                   # do not show statistics box
 
     args = sys.argv[1:]
@@ -247,27 +269,42 @@ def main():
         usage()
         sys.exit(2)
 
-    # -- import flux data
-    E_H, FE2_H0, FE2_H1 = np.loadtxt(sys.argv[1], delimiter = '\t', unpack=True)
-#    draw_H0_H1(E_H, FE2_H0, FE2_H1)
+    # =================
+    # Flux data
+    # =================
 
-    # -- normalize flux data (and plot)
+    # -- Import flux data
+    E_H, Flux_H0, Flux_H1 = np.loadtxt(sys.argv[1], delimiter = '\t', unpack=True)
+#    draw_H0_H1(E_H, Flux_H0, Flux_H1)
+    
+    # -- Normalize flux data (and plot)
+    #  - This is needed to easily determine the theoretically expected counts 
+    #    in an Energy bin when comparing each pseudo event with the expected 
+    #    flux data (H0&H1).
     Binsize = E_H[1]-E_H[0]
-    FE2_H1_norm = FE2_H1 / (sum(FE2_H1) * Binsize)
-    FE2_H0_norm = FE2_H0 / (sum(FE2_H0) * Binsize)                              # Also divide by binsize to make sure that the interpolated function is normalized to 1
-    #draw_H0_H1(E_H, FE2_H0_norm, FE2_H1_norm)
+    Flux_H0_norm = Flux_H0 / (sum(Flux_H0) * Binsize)                           # Also divide by binsize to make sure that the interpolated function is normalized to 1
+    Flux_H1_norm = Flux_H1 / (sum(Flux_H1) * Binsize)
+#    draw_H0_H1(E_H, Flux_H0_norm, Flux_H1_norm)
 
-    # -- check that the continuous function made with spectrum_func given FE2_H_norm data equals 1
-#    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H, FE2_H0_norm, FE2_H1_norm)
-#    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H, FE2_H0_norm, FE2_H1_norm)
+    # -- check that the continuous function made with spectrum_func given Flux_H_norm data equals 1
+#    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H, Flux_H0_norm, Flux_H1_norm)
+#    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H, Flux_H0_norm, Flux_H1_norm)
 #    integrant0, err1 = integrate.quad(f0_to_integrate, min(E_H), max(E_H))
 #    integrant1, err1 = integrate.quad(f1_to_integrate, min(E_H), max(E_H))
 #    print 'integrant0, integrant1', integrant0, integrant1
 
-    # -- Create Pseudo Measurement for N_events according to H0, and H1, (plot, and save figure)
-#    pseudo_exp(1000, 100, 0, 'H0', E_H, FE2_H0_norm, FE2_H1_norm)
-#    pseudo_exp(1000, 100, 0, 'H1', E_H, FE2_H0_norm, FE2_H1_norm)
+    # -- integrate flux data for inverse transform method
+    Int_Flux_H0 = integr_spectrum_func(E_H, Flux_H0_norm)
+    Int_Flux_H1 = integr_spectrum_func(E_H, Flux_H1_norm)
+#    draw_H0_H1(E_H, Int_Flux_H0, Int_Flux_H1)
 
+    # -- Create & save ONE Pseudo Measurement for H0 and H1 just to check
+    #    For saving; make sure "h3.Write..." in function pseudo_exp is active 
+#    f = ROOT.TFile("pseudoexp_histos.root", "recreate")
+#    pseudo_exp(10000, 100, 0, 'H0', E_H, Int_Flux_H0, Int_Flux_H1)
+#    pseudo_exp(10000, 100, 0, 'H1', E_H, Int_Flux_H0, Int_Flux_H1)
+#    f.Close()
+#    sys.exit()
 
     # =================
     # -- Perform hypothesis testing:
@@ -281,16 +318,15 @@ def main():
     p_value = []
     CL_value = []
 
-    for N in range(150):
+    for N in range(150):                                                                        ################################# <=========
         N = N+1
-        if N % 5 == 0:
-            print N
-
+        if N % 100 == 0:              # option to analyze N stepwise: %1 analyses every N       ################################# <=========
+            print "For %s events, create pseudo events." %N
 
             N_events.append(N)      # for each pseudo experiment
             bins = 100              # amount of bins in histogram of pseudo experiment
-            Eresolution = 0         # 0% error in Energy --> perfectly defined
-    
+            Eresolution = 0         # 0% error in Energy --> perfectly defined                  ################################# <=========
+
             if 0 < N_events[-1] <= 10:
                 h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 100, -5, 5)
                 h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 100, -5, 5)      
@@ -305,24 +341,24 @@ def main():
                 h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 100, -50, 50)
             LLR_H0data = []
             LLR_H1data = []
-    
+
             #   Check LLR for 'I_repetitions' pseudo events per hypothesis
-            I_repetitions = 1000
+            I_repetitions = 1000                                                                 ################################# <=========
             for i in range(I_repetitions):
                 if i % 10 == 0:
                     print "i = %s/%s" %(i,I_repetitions)
-                LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H, FE2_H0_norm, FE2_H1_norm))
-                LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H, FE2_H0_norm, FE2_H1_norm))
-    
-            savingname = "H0_H1_data_Nevt_%i_Irep_%i.txt"%(N_events[-1], I_repetitions)
+                LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
+                LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
+
+            savingname = "H0_H1_data_Nevt_%i_Irep_%i.txt"%(N_events[-1], I_repetitions)         ################################# <=========
             with open(savingname, 'w') as f:
                 for i in range(len(LLR_H0data)):
                     line = "%s,%s\n" %(LLR_H0data[i], LLR_H1data[i])
                     f.write(line)
     
             # plot and save Hypothesis testing
-#            savingname = "Hypothesis_testing_Nevt_%i_Irep_%i.png"%(N_events[-1], I_repetitions)
-#            plot_Hypothesis_test(h_h0, h_h1, savingname)
+            savingname = "Hypothesis_testing_Nevt_%i_Irep_%i.png"%(N_events[-1], I_repetitions)
+            plot_Hypothesis_test(h_h0, h_h1, savingname)
 
             # determine the median values of f(LLR|H1), and f(LLR|H0):
             median_H1 = median(LLR_H1data)
@@ -347,17 +383,12 @@ def main():
             h_h0.Delete()
             h_h1.Delete()
 
+
     print "Now write data to txt file"
-    with open("N_p_CL_test.txt", 'w') as f:
+    with open("N_p_CL_test.txt", 'w') as f:                                                     ################################# <========= NAAM
         for i in range(len(N_events)):
-            line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])
+            line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])                         ################################# <========= WELKE DATA OPSLAAN?
             f.write(line)
-
-#    plt.plot(N_events, p_value)
-#    plt.show()
-
-#    plt.plot(N_events, CL_value)
-#    plt.show()
 
 
 if __name__ == "__main__":
