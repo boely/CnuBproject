@@ -320,8 +320,8 @@ def main():
 
     for N in range(150):                                                                        ################################# <=========
         N = N+1
-        if N % 100 == 0:              # option to analyze N stepwise: %1 analyses every N       ################################# <=========
-            print "For %s events, create pseudo events." %N
+        if N % 1 == 0:              # option to analyze N stepwise: %1 analyses every N       ################################# <=========
+#            print "For %s events, create pseudo events." %N
 
             N_events.append(N)      # for each pseudo experiment
             bins = 100              # amount of bins in histogram of pseudo experiment
@@ -343,14 +343,14 @@ def main():
             LLR_H1data = []
 
             #   Check LLR for 'I_repetitions' pseudo events per hypothesis
-            I_repetitions = 1000                                                                 ################################# <=========
+            I_repetitions = 10000                                                                 ################################# <=========
             for i in range(I_repetitions):
-                if i % 10 == 0:
-                    print "i = %s/%s" %(i,I_repetitions)
+#                if i % 10 == 0:
+#                    print "i = %s/%s" %(i,I_repetitions)
                 LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
                 LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
 
-            savingname = "H0_H1_data_Nevt_%i_Irep_%i.txt"%(N_events[-1], I_repetitions)         ################################# <=========
+            savingname = "H0_H1_data_Nevt_%i_Irep_%i_%s.txt"%(N_events[-1], I_repetitions, sys.argv[1])         ################################# <=========
             with open(savingname, 'w') as f:
                 for i in range(len(LLR_H0data)):
                     line = "%s,%s\n" %(LLR_H0data[i], LLR_H1data[i])
@@ -385,7 +385,7 @@ def main():
 
 
     print "Now write data to txt file"
-    with open("N_p_CL_test.txt", 'w') as f:                                                     ################################# <========= NAAM
+    with open("N_p_CL_test_%s.txt" %sys.argv[1], 'w') as f:                                                     ################################# <========= NAAM
         for i in range(len(N_events)):
             line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])                         ################################# <========= WELKE DATA OPSLAAN?
             f.write(line)
