@@ -10,10 +10,13 @@ from math import *
 import numpy as np
 import matplotlib.pyplot as plt
 import ROOT
+ROOT.gROOT.SetBatch(True)   # so it doesn't try to actively popup graphics on the screen <= needed for stoomboot
 from scipy.interpolate import interp1d
 import scipy.integrate as integrate
 from bisect import bisect_left
 
+filename = os.path.splitext(os.path.basename(sys.argv[1]))[0]
+basename = filename.split("H0H1")[0]
 
 # =================
 # number of events
@@ -61,25 +64,30 @@ def fill_hist( func, H, E_H, Flux_H0, Flux_H1):
         z = func(e, H, E_H, Flux_H0, Flux_H1 )
         h1.SetBinContent( b, z )
 
+    h1.SetXTitle("Energy (eV)")
+    h1.SetYTitle("Flux (Arbitrary unit)")
+
     return h1
 
 
-def draw_H0_H1(E_H, Flux_H0, Flux_H1):
+def draw_H0_H1(what, E_H, Flux_H0, Flux_H1):
     '''Function that draws H0 and H1 from imported data in a histogram'''
     c1 = ROOT.TCanvas()
     h1 = fill_hist( spectrum_func , 'H0', E_H, Flux_H0, Flux_H1)
     h1.SetLineStyle(3)
     h1.Draw('LSAME')
+    h1.SetTitle("Flux function")
     h2 = fill_hist( spectrum_func , 'H1', E_H, Flux_H0, Flux_H1)
     h2.Draw('LSAME')
-    h2.SetXTitle("Energy (eV)")
-    h2.SetYTitle("Flux per bin")
-    h2.SetTitle("Search for dip")
+    h2.SetTitle("Flux function")
     c1.Update()
-    c1.SaveAs("original_functions_H0_and_H1.png")
+
+    h1.Write("Original_Flux_H0"+what)
+    h2.Write("Original_Flux_H1"+what)
+    c1.Write("Original_Flux_canvas"+what)
+
     h1.Delete()
     h2.Delete()
-
 
 # =================
 # Inverse Transform
@@ -171,20 +179,17 @@ def plot_LLR_value_in_hist(N_events, bins, Eresolution, H, hist, E_H, Flux_H0, F
 def pseudo_exp(N_events, bins, Eresolution, H, E_H, Int_Flux_H0, Int_Flux_H1):
     '''Functin that creates pseudo experiments of N_events detections,
     based on the acceptence - rejection method'''
-#    c3 = ROOT.TCanvas()
-    h3 = ROOT.TH1D( 'h3','inverse_transform, N=%s'%(N_events), bins, min(E_H), max(E_H))
+    h3 = ROOT.TH1D( 'h3','Pseudo Experiment, N=%s'%(N_events), bins, min(E_H), max(E_H))
     for i in range(N_events):
 #        if i % (N_events/10) == 0:
 #            print "%s/%s" %(i, N_events)
         E = inverse_transform(E_H, Int_Flux_H0, Int_Flux_H1, H)
-        E = E * ROOT.gRandom.Gaus(1., Eresolution/100.) #Gauss(mean, sigma)          # <= wat doen met E<0?!
+        E = E * ROOT.gRandom.Gaus(1., Eresolution/100.) #Gauss(mean, sigma)          # <==================================== wat doen met E<0?!
         h3.Fill(E)
-#    h3.Draw()
     h3.SetXTitle("Energy (eV)")
     h3.SetYTitle("Counts per bin")
-#    c3.SaveAs("inverse_transform_pseudo_event_Eresol%s_N%s_%s.png"%(Eresolution, N_events, H))
 
-#    h3.Write('inverse_transform, %s, N=%s, Eres=%s'%(H, N_events, Eresolution))
+#    h3.Write('Pseudo_exp_InvTr, %s, N=%s, Eres=%s'%(H, N_events, Eresolution))
     return h3
 
 
@@ -232,7 +237,10 @@ def plot_Hypothesis_test(h_h0, h_h1, savingname):
     h_h0.SetXTitle("Test statistic log(lambda)")
     h_h0.SetYTitle("Probability density (counts)")
 
-    cc.SaveAs(savingname)
+    h_h0.Write(savingname+'H0')
+    h_h1.Write(savingname+'H1')
+
+    cc.Write(savingname)
 
 
 def plot_line(canvas, hist, teststatistic, savingname):
@@ -242,7 +250,7 @@ def plot_line(canvas, hist, teststatistic, savingname):
     line.SetLineWidth(3)
     line.Draw('SAME')
     canvas.Update()
-    canvas.SaveAs(savingname)
+    canvas.Write(savingname)
 
 
 def median(lst):
@@ -262,7 +270,12 @@ def usage():
 
 def main():
 
+    print basename
+
+    f = ROOT.TFile(basename+"histos.root", "recreate")                         # create root file to save everything in
+
     ROOT.gStyle.SetOptStat(0)                                                   # do not show statistics box
+    ROOT.gStyle.SetTitleOffset(1.3, "y")                                        # spacing y-label
 
     args = sys.argv[1:]
     if "-h" in args or "--help" in args or len(args) < 1:
@@ -275,7 +288,7 @@ def main():
 
     # -- Import flux data
     E_H, Flux_H0, Flux_H1 = np.loadtxt(sys.argv[1], delimiter = '\t', unpack=True)
-#    draw_H0_H1(E_H, Flux_H0, Flux_H1)
+    draw_H0_H1("Flux", E_H, Flux_H0, Flux_H1)
     
     # -- Normalize flux data (and plot)
     #  - This is needed to easily determine the theoretically expected counts 
@@ -284,19 +297,19 @@ def main():
     Binsize = E_H[1]-E_H[0]
     Flux_H0_norm = Flux_H0 / (sum(Flux_H0) * Binsize)                           # Also divide by binsize to make sure that the interpolated function is normalized to 1
     Flux_H1_norm = Flux_H1 / (sum(Flux_H1) * Binsize)
-#    draw_H0_H1(E_H, Flux_H0_norm, Flux_H1_norm)
+    draw_H0_H1("Norm", E_H, Flux_H0_norm, Flux_H1_norm)
 
-    # -- check that the continuous function made with spectrum_func given Flux_H_norm data equals 1
+    # -- Check that the continuous function made with spectrum_func given Flux_H_norm data equals 1
 #    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H, Flux_H0_norm, Flux_H1_norm)
 #    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H, Flux_H0_norm, Flux_H1_norm)
 #    integrant0, err1 = integrate.quad(f0_to_integrate, min(E_H), max(E_H))
 #    integrant1, err1 = integrate.quad(f1_to_integrate, min(E_H), max(E_H))
 #    print 'integrant0, integrant1', integrant0, integrant1
 
-    # -- integrate flux data for inverse transform method
+    # -- Integrate flux data for inverse transform method
     Int_Flux_H0 = integr_spectrum_func(E_H, Flux_H0_norm)
     Int_Flux_H1 = integr_spectrum_func(E_H, Flux_H1_norm)
-#    draw_H0_H1(E_H, Int_Flux_H0, Int_Flux_H1)
+    draw_H0_H1("Int", E_H, Int_Flux_H0, Int_Flux_H1)
 
     # -- Create & save ONE Pseudo Measurement for H0 and H1 just to check
     #    For saving; make sure "h3.Write..." in function pseudo_exp is active 
@@ -320,8 +333,8 @@ def main():
 
     for N in range(150):                                                                        ################################# <=========
         N = N+1
-        if N % 1 == 0:              # option to analyze N stepwise: %1 analyses every N       ################################# <=========
-#            print "For %s events, create pseudo events." %N
+        if N % 50 == 0:              # option to analyze N stepwise: %1 analyses every N       ################################# <=========
+            print "For %s events, create pseudo events." %N
 
             N_events.append(N)      # for each pseudo experiment
             bins = 100              # amount of bins in histogram of pseudo experiment
@@ -343,21 +356,20 @@ def main():
             LLR_H1data = []
 
             #   Check LLR for 'I_repetitions' pseudo events per hypothesis
-            I_repetitions = 10000                                                                 ################################# <=========
+            I_repetitions = 100                                                              ################################# <=========
             for i in range(I_repetitions):
-#                if i % 10 == 0:
-#                    print "i = %s/%s" %(i,I_repetitions)
+                if i % 10 == 0:
+                    print "i = %s/%s" %(i,I_repetitions)
                 LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
                 LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
 
-            savingname = "H0_H1_data_Nevt_%i_Irep_%i_%s.txt"%(N_events[-1], I_repetitions, sys.argv[1])         ################################# <=========
-            with open(savingname, 'w') as f:
-                for i in range(len(LLR_H0data)):
-                    line = "%s,%s\n" %(LLR_H0data[i], LLR_H1data[i])
-                    f.write(line)
-    
+            savingname = "%s_Eres%s_H0_H1_data_Nevt_%i_Irep_%i.txt" %(basename, Eresolution, N_events[-1], I_repetitions)
+#            with open(savingname, 'w') as txtfile:
+#                for i in range(len(LLR_H0data)):
+#                    line = "%s,%s\n" %(LLR_H0data[i], LLR_H1data[i])
+#                    txtfile.write(line)
+
             # plot and save Hypothesis testing
-            savingname = "Hypothesis_testing_Nevt_%i_Irep_%i.png"%(N_events[-1], I_repetitions)
             plot_Hypothesis_test(h_h0, h_h1, savingname)
 
             # determine the median values of f(LLR|H1), and f(LLR|H0):
@@ -370,7 +382,7 @@ def main():
             # determine expected p-value if H1 is true, print and plot
             p_value.append(determine_p_value(h_h0, median_H1))
             print 'expected p-value if H1 is true = ', p_value[-1]
-            #plot_line(cc, h_h0, median_H1, "Hypothesis_testing_p_value_Nevt_%i_Irep_%i.png"%(N_events[-1], I_repetitions))
+            #plot_line(cc, h_h0, median_H1, "Hypothesis_testing_p_value_Nevt_%i_Irep_%i"%(N_events[-1], I_repetitions))
 
             # =================
             # -- CL(s+b)-value analysis
@@ -378,17 +390,18 @@ def main():
             # determine expected p-value if H1 is true, print and plot
             CL_value.append(determine_CL_value(h_h0, median_H1))
             print 'expected CL-value if H1 can be excluded = ', CL_value[-1]
-            #plot_line(cc, h_h1, median_H0, "Hypothesis_testing_CL_value_Nevt_%i_Irep_%i.png"%(N_events[-1], I_repetitions))
+            #plot_line(cc, h_h1, median_H0, "Hypothesis_testing_CL_value_Nevt_%i_Irep_%i"%(N_events[-1], I_repetitions))
     
             h_h0.Delete()
             h_h1.Delete()
 
-
     print "Now write data to txt file"
-    with open("N_p_CL_test_%s.txt" %sys.argv[1], 'w') as f:                                                     ################################# <========= NAAM
+    with open("%s_Eres%s_N_p_CL_test.txt" %(basename, Eresolution), 'w') as txtfile:                                                     ################################# <========= NAAM
         for i in range(len(N_events)):
             line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])                         ################################# <========= WELKE DATA OPSLAAN?
-            f.write(line)
+            txtfile.write(line)
+
+    f.Close()
 
 
 if __name__ == "__main__":
