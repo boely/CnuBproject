@@ -72,7 +72,7 @@ class NeutrinoFlux():
         m_z = 91.2e9    # [eV]
         self.Eres = m_z**2 / (2. * self.m_n)                                   # (eq 1)
 
-    def Hubble(self, z, h=0.71, Om=0.3, Ol=0.7, Ok=0.):
+    def Hubble(self, z, h=0.678, Om=0.308, Ol=0.692, Ok=0.):
         '''Function to determine the hubble parameter at given z. The curvature 
         parameters are given a default values resulting in a flat universe'''
         # default values from Ebe04
@@ -83,11 +83,11 @@ class NeutrinoFlux():
         return sqrt(H0**2 * ( Om * (1+z)**3 + Ok * (1+z)**2 + Ol) )                 # (eq 8)
 
     def Ebe04_survival_probability_P(self, e, z, 
-                                     h=0.71, Om=0.3, Ol=0.7, Ok=0.):
+                                     h=0.678, Om=0.308, Ol=0.692, Ok=0.):
         '''Funtion that returns survival probability for the e values 
         within range: Eres/(1+z) < e < Eres ''' 
 
-        ann_prob = 0.71/h * 0.03        # anihilation probability                   # (Ebe04: eq16)
+        ann_prob = 0.678/h * 0.03        # anihilation probability                   # (Ebe04: eq16)
         assert(float(Om + Ol + Ok) == 1.), "No Flat Universe!"
 
         if e < self.Eres/(1+z) or e > self.Eres:
