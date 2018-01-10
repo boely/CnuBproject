@@ -1,0 +1,143 @@
+Warning: no access to tty (Bad file descriptor).
+Thus no job control in this shell.
+Activate: ROOT has been sourced. Environment settings are ready. 
+ROOTSYS=/project/datagrid/anaconda/envs/py27root5
+Working directory = 
+/tmpdir/18989472.allier.nikhef.nl
+
+Directory contents: 
+
+Copying input files
+Directory contents: 
+config.m4
+create_fluxes.py
+NeutrinoFlux.py
+Statistics.py
+
+Running
+Reading config file ERES0_F_BU.cfg 
+Writing data to txt file for absorption (H1), and no absorption (H0). 
+One moment please...
+#error "You need a ISO C conforming compiler to use the glibc headers"
+*** Interpreter error recovered ***
+TFile::Append:0: RuntimeWarning: Replacing existing TH1: h1 (Potential memory leak).
+TFile::Append:0: RuntimeWarning: Replacing existing TH1: h1 (Potential memory leak).
+TFile::Append:0: RuntimeWarning: Replacing existing TH1: h3 (Potential memory leak).
+TFile::Append:0: RuntimeWarning: Replacing existing TH1: h1 (Potential memory leak).
+/project/datagrid/anaconda/lib/python2.7/site-packages/scipy/integrate/quadpack.py:356: IntegrationWarning: The maximum number of subdivisions (50) has been achieved.
+  If increasing the limit yields no improvement it is advised to analyze 
+  the integrand in order to determine the difficulties.  If the position of a 
+  local difficulty can be determined (singularity, discontinuity) one will 
+  probably gain from splitting up the interval and calling the integrator 
+  on the subranges.  Perhaps a special-purpose integrator should be used.
+  warnings.warn(msg, IntegrationWarning)
+TFile::Append:0: RuntimeWarning: Replacing existing TH1: h1 (Potential memory leak).
+TFile::Append:0: RuntimeWarning: Replacing existing TH1: h1 (Potential memory leak).
+ERES0_F_BU_
+ERES0
+ERES =  0.0
+For 350 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.379573415511
+expected CL-value if H1 can be excluded =  0.382154079318
+For 400 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.366061221921
+expected CL-value if H1 can be excluded =  0.364611869889
+For 450 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.358611390009
+expected CL-value if H1 can be excluded =  0.355442835477
+For 500 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.360764349787
+expected CL-value if H1 can be excluded =  0.357058851085
+For 550 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.356409352148
+expected CL-value if H1 can be excluded =  0.359822276608
+For 600 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.348918724829
+expected CL-value if H1 can be excluded =  0.344997888804
+For 650 events, create pseudo events.
+i = 0/10000
+i = 1000/10000
+i = 2000/10000
+i = 3000/10000
+i = 4000/10000
+i = 5000/10000
+i = 6000/10000
+i = 7000/10000
+i = 8000/10000
+i = 9000/10000
+expected p-value if H1 is true =  0.339176080658
+expected CL-value if H1 can be excluded =  0.338303048931
+Now write data to txt file
+DURATION OF STATISTICS.PY 14:54:18.984747
+Directory contents: 
+config.m4
+create_fluxes.py
+ERES0_F_BU.cfg
+ERES0_F_BU_H0H1_m0.1_zmax2_n4_alpha2_ZdecayTrue.txt
+ERES0_F_BU_histos_RUN16.root
+ERES0_F_BU__RUN16_N_p_CL_test.txt
+NeutrinoFlux.py
+NeutrinoFlux.pyc
+Statistics.py
+
+Copying output files.
