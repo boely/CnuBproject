@@ -135,7 +135,7 @@ class NeutrinoFlux():
 
         # INTEGRATION BOUNDARIES:
         integrant1, err1 = integrate.quad(f1_to_integrate, self.z_min, self.z_max)
-        
+
         # if z > z_max; L (Ebe04_source_emissivity_L_z) returns 0, therfore this doesn't add anything to the integral
         # Lun13: for E > 10^11 GeV, neutrinio horizon of z ~ 140,
         # beyond which universe is opaque to neutrinos <= taking this as upperlimit gives the same
