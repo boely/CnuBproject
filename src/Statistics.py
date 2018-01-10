@@ -300,7 +300,7 @@ def main():
     startTime = datetime.now()
     print basename
 
-    f = ROOT.TFile(basename+"histos_RUN16.root", "recreate")                     # create root file to save everything in   	  ################################# <========= RUN
+    f = ROOT.TFile(basename+"histos_RUNxx.root", "recreate")                     # create root file to save everything in   	  ################################# <========= RUN
 
     ROOT.gStyle.SetOptStat(0)                                                   # do not show statistics box
     ROOT.gStyle.SetTitleOffset(1.3, "y")                                        # spacing y-label
@@ -462,7 +462,7 @@ def main():
             h_h1.Delete()
 
     print "Now write data to txt file"
-    with open("%s_RUN16_N_p_CL_test.txt" %(basename), 'w') as txtfile:                                                     ################################# <========= RUN
+    with open("%s_RUNxx_N_p_CL_test.txt" %(basename), 'w') as txtfile:                                                     ################################# <========= RUN
         for i in range(len(N_events)):
             line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])
             txtfile.write(line)
