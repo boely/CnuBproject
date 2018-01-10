@@ -10,27 +10,17 @@ from math import *
 import numpy as np
 import matplotlib.pyplot as plt
 import ROOT
-ROOT.gROOT.SetBatch(True)   # so it doesn't try to actively popup graphics on the screen <= needed for stoomboot
+ROOT.gROOT.SetBatch(True)   # so it doesn't try to actively pop-up graphics on the screen <= needed for stoomboot!
 from scipy.interpolate import interp1d
 import scipy.integrate as integrate
 from bisect import bisect_left
+from datetime import datetime
 
 filename = os.path.splitext(os.path.basename(sys.argv[1]))[0]
 basename = filename.split("H0H1")[0]
 
-# =================
-# number of events
-# =================
-
-def events(Flux):
-    '''Function to convert flux to amount of events'''
-    Detector_eff = 0.01 # [fraction] for now assume 1% detector efficiency       <== Gauss
-    t = 10              # [years]
-    A = pi*500**2       # [m^2]      pi * (500m)^2 = opp 1 Antares blok
-    Theta = 2*pi        # [sr]       Full sphere is 4pi sr
-                        #            --> here half of the angular resolution
-    return (60*60*24*365.25 * t) * A * Theta * Detector_eff * Flux
-
+Elb = 5e20 # range of interest for the dip <- should implement in config file...
+Eub = 5e22 # range of interest for the dip <- should implement in config file...
 
 # =================
 # Flux data
@@ -73,13 +63,13 @@ def fill_hist( func, H, E_H, Flux_H0, Flux_H1):
 def draw_H0_H1(what, E_H, Flux_H0, Flux_H1):
     '''Function that draws H0 and H1 from imported data in a histogram'''
     c1 = ROOT.TCanvas()
+    h2 = fill_hist( spectrum_func , 'H1', E_H, Flux_H0, Flux_H1)
+    h2.Draw('LSAME')
+    h2.SetTitle("Flux function")
     h1 = fill_hist( spectrum_func , 'H0', E_H, Flux_H0, Flux_H1)
     h1.SetLineStyle(3)
     h1.Draw('LSAME')
     h1.SetTitle("Flux function")
-    h2 = fill_hist( spectrum_func , 'H1', E_H, Flux_H0, Flux_H1)
-    h2.Draw('LSAME')
-    h2.SetTitle("Flux function")
     c1.Update()
 
     h1.Write("Original_Flux_H0"+what)
@@ -122,6 +112,9 @@ def integr_spectrum_func(E_H, Flux_H):
 
 
 def inverse_transform(E_H, Int_Flux_H0, Int_Flux_H1, H):
+    '''Funtion that returns the energy corrsponding to the randomly picked
+    flux value from the integrated flux
+    Function can be improven by doing it not binwise but continuous'''
     if H == 'H1': 
         Int_Flux = Int_Flux_H1
     elif H == 'H0':
@@ -155,6 +148,9 @@ def log_likelihood(hist, H, N_events, E_H, Flux_H0, Flux_H1):
             loglik += ROOT.TMath.Log( ROOT.TMath.Poisson( Nevt_bin, mu_bin ) )
         else:
             print "Negative probability!!"
+	    print "Found amount of events in bin: ",i_bin," = ", Nevt_bin
+	    print "Expected amount of events in bin: ",i_bin, " = ", mu_bin
+	    print "Poisson would give probability of: ", ROOT.TMath.Poisson( Nevt_bin, mu_bin )
     return loglik
 
 
@@ -177,15 +173,15 @@ def plot_LLR_value_in_hist(N_events, bins, Eresolution, H, hist, E_H, Flux_H0, F
 
 
 def pseudo_exp(N_events, bins, Eresolution, H, E_H, Int_Flux_H0, Int_Flux_H1):
-    '''Functin that creates pseudo experiments of N_events detections,
+    '''Function that creates pseudo experiments of N_events detections,
     based on the acceptence - rejection method'''
-    h3 = ROOT.TH1D( 'h3','Pseudo Experiment, N=%s'%(N_events), bins, min(E_H), max(E_H))
-    for i in range(N_events):
+    h3 = ROOT.TH1D( 'h3','Pseudo Experiment, N=%s'%(N_events), int(bins), min(E_H), max(E_H))
+    for i in range(int(N_events)):
 #        if i % (N_events/10) == 0:
 #            print "%s/%s" %(i, N_events)
         E = inverse_transform(E_H, Int_Flux_H0, Int_Flux_H1, H)
-        E = E * ROOT.gRandom.Gaus(1., Eresolution/100.) #Gauss(mean, sigma)          # <==================================== wat doen met E<0?!
-        h3.Fill(E)
+        Enieuw = E * ROOT.gRandom.Gaus(1., Eresolution/100.) #Gauss(mean, sigma)
+        h3.Fill(Enieuw)
     h3.SetXTitle("Energy (eV)")
     h3.SetYTitle("Counts per bin")
 
@@ -261,6 +257,37 @@ def median(lst):
     return sum(sorted(lst)[quotient - 1:quotient + 1]) / 2.
 
 
+def Flux_for_Resolution(N_events, bins, ERES, E_H, Int_Flux_H0, Int_Flux_H1):
+    '''Function that applies the energy resolution for H0 and H1 theory in a
+    wide range (range of the <flux data file>), and returns the smeared
+    flux in the energy range of interest: Elb < E < Eub'''
+    Bins = int((max(E_H)-min(E_H)) * int(bins) / (Eub - Elb)) # scaling
+    print "ERES = ", ERES
+    hist0 = pseudo_exp(int(N_events), Bins, ERES, 'H0', E_H, Int_Flux_H0, Int_Flux_H1)
+    hist0.Write('Pseudo_exp_InvTr, H0, N=%s, Eres=%s'%(N_events, ERES))
+    hist1 = pseudo_exp(int(N_events), Bins, ERES, 'H1', E_H, Int_Flux_H0, Int_Flux_H1)
+    hist1.Write('Pseudo_exp_InvTr, H1, N=%s, Eres=%s'%(N_events, ERES))
+
+    E_H = []
+    Flux_H0 = []
+    Flux_H1 = []
+
+    binwidth = hist0.GetBinWidth(1)
+
+    for i_bin in range(hist0.GetNbinsX()):
+        if (hist0.GetBinCenter(i_bin) + 0.5 * binwidth) >= Elb and (hist0.GetBinCenter(i_bin) - 0.5 * binwidth ) <= Eub:
+            E_H.append(hist0.GetBinCenter(i_bin))
+            Flux_H0.append(hist0.GetBinContent(i_bin))
+    
+#    i = 0
+    for i_bin in range(hist1.GetNbinsX()):
+        if (hist1.GetBinCenter(i_bin) + 0.5 * binwidth) >= Elb and (hist1.GetBinCenter(i_bin) - 0.5 * binwidth ) <= Eub:
+#           if E_H[i] != hist1.GetBinCenter(i_bin):
+#                print "EH[i] of H0 = ", E_H[i], " whereas E_H[i] of H1 = ", hist1.GetBinCenter(i_bin), "\n this is in bin i = ", i
+            Flux_H1.append(hist1.GetBinContent(i_bin))
+#            i += 1
+    return np.asarray(E_H), np.asarray(Flux_H0), np.asarray(Flux_H1) # needed to be numpy arrays
+
 # =================
 # main & usage
 # =================
@@ -270,9 +297,10 @@ def usage():
 
 def main():
 
+    startTime = datetime.now()
     print basename
 
-    f = ROOT.TFile(basename+"histos.root", "recreate")                         # create root file to save everything in
+    f = ROOT.TFile(basename+"histos_RUN16.root", "recreate")                     # create root file to save everything in   	  ################################# <========= RUN
 
     ROOT.gStyle.SetOptStat(0)                                                   # do not show statistics box
     ROOT.gStyle.SetTitleOffset(1.3, "y")                                        # spacing y-label
@@ -289,35 +317,74 @@ def main():
     # -- Import flux data
     E_H, Flux_H0, Flux_H1 = np.loadtxt(sys.argv[1], delimiter = '\t', unpack=True)
     draw_H0_H1("Flux", E_H, Flux_H0, Flux_H1)
-    
+
+    # -- Flux does not need to be normalized here yet (!).
+    #    Inverse transform method only needs shape
+
+    # -- Integrate flux data for inverse transform method
+    Int_Flux_H0 = integr_spectrum_func(E_H, Flux_H0)
+    Int_Flux_H1 = integr_spectrum_func(E_H, Flux_H1)
+    draw_H0_H1("Int", E_H, Int_Flux_H0, Int_Flux_H1)
+
+    # =================
+    # Energy Resolution
+    # =================
+    bins = 100              # amount of bins in histogram of pseudo experiment (between Elb and Eub)
+
+    N = int(1e6)                                                             				  ################################# <=========
+    # -- Create & save ONE Smeared Pseudo Measurement with maaany events for new H0 and H1 shape including resolution
+    if "ERES0_" in basename:
+        print 'ERES0'
+        E_H, Flux_H0, Flux_H1 = Flux_for_Resolution(N, bins, 0., E_H, Int_Flux_H0, Int_Flux_H1)
+    elif "ERES30_" in basename:
+        print 'ERES30'
+        E_H, Flux_H0, Flux_H1 = Flux_for_Resolution(N, bins, 30., E_H, Int_Flux_H0, Int_Flux_H1)
+    elif "ERES80_" in basename:
+        print 'ERES80'
+        E_H, Flux_H0, Flux_H1 = Flux_for_Resolution(N, bins, 80., E_H, Int_Flux_H0, Int_Flux_H1)
+    else:
+        print "Couldn't find que 'ERES0', 'ERES30', or 'ERES80' in basneme... CONTINUED WITH ERES0"
+        E_H, Flux_H0, Flux_H1 = Flux_for_Resolution(N, bins, 0., E_H, Int_Flux_H0, Int_Flux_H1)
+
+    # =================
+    # Flux data with Eresolution applied
+    # =================
+    draw_H0_H1("FluxERES", E_H, Flux_H0, Flux_H1)
+
+    # -- Redefine flux datapoints so that I have 10000 datapoints between
+    #    min(E_H) == 5e20 (Elb), and max(E_H) == 5e22 (Eub) again.
+    E = np.linspace(Elb, Eub, 10000) # <= from Neutrinoflux.py
+    Flux_tmp_H0 = []
+    Flux_tmp_H1 = []
+    for e in E:
+        Flux_tmp_H0.append(spectrum_func(e, 'H0', E_H, Flux_H0, Flux_H1))
+        Flux_tmp_H1.append(spectrum_func(e, 'H1', E_H, Flux_H0, Flux_H1))
+    E_H = E
+
     # -- Normalize flux data (and plot)
     #  - This is needed to easily determine the theoretically expected counts 
     #    in an Energy bin when comparing each pseudo event with the expected 
     #    flux data (H0&H1).
-    Binsize = E_H[1]-E_H[0]
-    Flux_H0_norm = Flux_H0 / (sum(Flux_H0) * Binsize)                           # Also divide by binsize to make sure that the interpolated function is normalized to 1
-    Flux_H1_norm = Flux_H1 / (sum(Flux_H1) * Binsize)
-    draw_H0_H1("Norm", E_H, Flux_H0_norm, Flux_H1_norm)
+    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H, Flux_tmp_H0, Flux_tmp_H1)
+    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H, Flux_tmp_H0, Flux_tmp_H1)
+    integrant0, err1 = integrate.quad(f0_to_integrate, Elb, Eub)
+    integrant1, err1 = integrate.quad(f1_to_integrate, Elb, Eub)
 
-    # -- Check that the continuous function made with spectrum_func given Flux_H_norm data equals 1
+    Flux_H0_norm = np.asarray(Flux_tmp_H0) / integrant0
+    Flux_H1_norm = np.asarray(Flux_tmp_H1) / integrant1
+    draw_H0_H1("NormERES", E_H, Flux_H0_norm, Flux_H1_norm)
+
+#    # -- Check that the continuous function made with spectrum_func given Flux_H_norm data equals 1
 #    f0_to_integrate = lambda e: spectrum_func(e, 'H0', E_H, Flux_H0_norm, Flux_H1_norm)
 #    f1_to_integrate = lambda e: spectrum_func(e, 'H1', E_H, Flux_H0_norm, Flux_H1_norm)
-#    integrant0, err1 = integrate.quad(f0_to_integrate, min(E_H), max(E_H))
-#    integrant1, err1 = integrate.quad(f1_to_integrate, min(E_H), max(E_H))
+#    integrant0, err1 = integrate.quad(f0_to_integrate, Elb, Eub)
+#    integrant1, err1 = integrate.quad(f1_to_integrate, Elb, Eub)
 #    print 'integrant0, integrant1', integrant0, integrant1
 
     # -- Integrate flux data for inverse transform method
     Int_Flux_H0 = integr_spectrum_func(E_H, Flux_H0_norm)
     Int_Flux_H1 = integr_spectrum_func(E_H, Flux_H1_norm)
-    draw_H0_H1("Int", E_H, Int_Flux_H0, Int_Flux_H1)
-
-    # -- Create & save ONE Pseudo Measurement for H0 and H1 just to check
-    #    For saving; make sure "h3.Write..." in function pseudo_exp is active 
-#    f = ROOT.TFile("pseudoexp_histos.root", "recreate")
-#    pseudo_exp(10000, 100, 0, 'H0', E_H, Int_Flux_H0, Int_Flux_H1)
-#    pseudo_exp(10000, 100, 0, 'H1', E_H, Int_Flux_H0, Int_Flux_H1)
-#    f.Close()
-#    sys.exit()
+    draw_H0_H1("IntERES", E_H, Int_Flux_H0, Int_Flux_H1)
 
     # =================
     # -- Perform hypothesis testing:
@@ -331,39 +398,38 @@ def main():
     p_value = []
     CL_value = []
 
-    for N in range(150):                                                                        ################################# <=========
-        N = N+1
+    for N in range(350):                                                                      ################################# <=========
+        N = N+301
         if N % 50 == 0:              # option to analyze N stepwise: %1 analyses every N       ################################# <=========
             print "For %s events, create pseudo events." %N
 
             N_events.append(N)      # for each pseudo experiment
-            bins = 100              # amount of bins in histogram of pseudo experiment
-            Eresolution = 0         # 0% error in Energy --> perfectly defined                  ################################# <=========
+            Eresolution = 0         # Since it is already implemented in shape of H0 and H1.
 
             if 0 < N_events[-1] <= 10:
-                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 100, -5, 5)
-                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 100, -5, 5)      
+                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 1000, -5, 5)
+                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 1000, -5, 5)      
             elif 10 < N_events[-1] <= 100:
-                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 100, -15, 15)
-                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 100, -15, 15)
+                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 3000, -15, 15)
+                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 3000, -15, 15)
             elif 100 < N_events[-1] <= 500:
-                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 100, -30, 30)
-                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 100, -30, 30)
+                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 6000, -30, 30)
+                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 6000, -30, 30)
             else:
-                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 100, -50, 50)
-                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 100, -50, 50)
+                h_h0 = ROOT.TH1D( 'h_h0','LLR for H0', 10000, -50, 50)
+                h_h1 = ROOT.TH1D( 'h_h1','LLR for H1', 10000, -50, 50)
             LLR_H0data = []
             LLR_H1data = []
 
             #   Check LLR for 'I_repetitions' pseudo events per hypothesis
-            I_repetitions = 100                                                              ################################# <=========
+            I_repetitions = int(1e4)                                                              ################################# <=========
             for i in range(I_repetitions):
-                if i % 10 == 0:
+                if i % 1000 == 0:
                     print "i = %s/%s" %(i,I_repetitions)
                 LLR_H0data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H0', h_h0, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
                 LLR_H1data.append(plot_LLR_value_in_hist(N_events[-1], bins, Eresolution, 'H1', h_h1, E_H, Flux_H0_norm, Flux_H1_norm, Int_Flux_H0, Int_Flux_H1))
 
-            savingname = "%s_Eres%s_H0_H1_data_Nevt_%i_Irep_%i.txt" %(basename, Eresolution, N_events[-1], I_repetitions)
+            savingname = "%s_H0_H1_data_Nevt_%i_Irep_%i.txt" %(basename, N_events[-1], I_repetitions)
 #            with open(savingname, 'w') as txtfile:
 #                for i in range(len(LLR_H0data)):
 #                    line = "%s,%s\n" %(LLR_H0data[i], LLR_H1data[i])
@@ -388,21 +454,22 @@ def main():
             # -- CL(s+b)-value analysis
             # =================
             # determine expected p-value if H1 is true, print and plot
-            CL_value.append(determine_CL_value(h_h0, median_H1))
+            CL_value.append(determine_CL_value(h_h1, median_H0))
             print 'expected CL-value if H1 can be excluded = ', CL_value[-1]
             #plot_line(cc, h_h1, median_H0, "Hypothesis_testing_CL_value_Nevt_%i_Irep_%i"%(N_events[-1], I_repetitions))
-    
+
             h_h0.Delete()
             h_h1.Delete()
 
     print "Now write data to txt file"
-    with open("%s_Eres%s_N_p_CL_test.txt" %(basename, Eresolution), 'w') as txtfile:                                                     ################################# <========= NAAM
+    with open("%s_RUN16_N_p_CL_test.txt" %(basename), 'w') as txtfile:                                                     ################################# <========= RUN
         for i in range(len(N_events)):
-            line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])                         ################################# <========= WELKE DATA OPSLAAN?
+            line = "%s,%s,%s\n" %(N_events[i], p_value[i], CL_value[i])
             txtfile.write(line)
 
     f.Close()
 
+    print "DURATION OF STATISTICS.PY", datetime.now() - startTime
 
 if __name__ == "__main__":
     sys.exit(main())
