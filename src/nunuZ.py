@@ -135,7 +135,7 @@ def main():
     
     neutrino_mass = 1e-5
     nnZ = nunuZ(neutrino_mass)
-    print nnZ.get_cms_energy()
+    print(nnZ.get_cms_energy())
     fig = plt.figure()
 
     energy = np.arange(1E25, 1E28, 1E24) #eV
