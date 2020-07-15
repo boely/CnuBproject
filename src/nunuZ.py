@@ -117,7 +117,7 @@ class nunuZ:
         return self.nunub_nunub_t(UHE_energy)
 
     def nunub_nunub_st_channel(self, UHE_energy):
-        return self.nunub_nunub_t(UHE_energy)
+        return self.nunub_nunub_st(UHE_energy)
 
     def nunu_nunu_t_channel(self, UHE_energy):
         return self.nunu_nunu_t(UHE_energy)
